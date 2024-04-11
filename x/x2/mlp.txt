@@ -1,0 +1,59 @@
+image_dr=os.path.join(file)
+gt=os.path.join(file,'gt.txt')
+
+ground=[]
+with open(gt,"r") as file:
+    for line in file:
+        data=line.strip().split(";")
+        fname=data[0]
+        left=data[1]
+        top=data[2]
+        right=data[3]
+        bottom=data[4]
+        la=data[5]
+        ground.append((fname,(left,top,right,bottom),la))
+        
+
+from PIL import Image
+features = []
+labels = []
+for filename, dim, cid in ground:
+    image_path = os.path.join(image_dr, filename)
+    image = Image.open(image_path)
+    w, h = image.size
+    dim = [int(val) for val in dim]
+    y1, y2, x1, x2 = max(0, dim[1]), min(h, dim[3]), max(0, dim[0]), min(w, dim[2])
+    roi = image.crop((x1, y1, x2, y2))
+    features.append(roi)
+    labels.append(cid)
+
+    
+resized_images = [image.resize((30, 30)) for image in features]
+features = np.array([np.array(image).flatten() for image in resized_images])
+
+import math
+nc=len(np.unique(labels))
+ns=10
+nr=math.ceil(nc/ns)
+fig, axes = plt.subplots(nr, ns, figsize=(10, 1*nr))
+for idx,class_label in enumerate(np.unique(labels)):
+    si=resized_images[labels.index(class_label)]
+    ax=axes[idx//ns,idx%ns]
+    ax.imshow(si)
+    ax.set_title(f"class{class_label}")
+for ax in axes.flatten():
+    if not ax.images:
+            ax.axis("off")
+plt.tight_layout()
+plt.show()
+
+plt.figure(figsize=(16, 12))
+class_counts = pd.Series(labels).value_counts()
+plt.bar(class_counts.index, class_counts.values)
+plt.xlabel('Class')
+plt.ylabel('Frequency')
+plt.title('Distribution of Classes')  
+plt.xticks(rotation=90) 
+plt.show()
+
+features=features/255.0

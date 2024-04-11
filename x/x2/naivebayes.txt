@@ -1,0 +1,51 @@
+df['target'] = df['target'].replace({'a': 0, 'b': 1})
+import numpy as np
+from sklearn.datasets import load_iris
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+scaler=StandardScaler()
+class NaiveBayesBinaryClassifier:
+  def __init__(self):
+    self.class_priors = None
+    self.feature_probs = None
+
+  def fit(self, X, y):
+    # Calculate class priors
+    self.class_priors = np.bincount(y) / len(y)
+
+    # Feature scaling (consider adding this for better performance)
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X)
+
+    # Calculate feature probabilities for each class
+    self.feature_probs = []
+    for label in np.unique(y):
+      class_samples = X_scaled[y == label]
+      class_probs = (np.sum(class_samples, axis=0) + 1) / (len(class_samples) + 2)  # Laplace smoothing
+
+      self.feature_probs.append(class_probs)
+    self.feature_probs = np.array(self.feature_probs)
+
+  def predict(self, X):
+    # Feature scaling (ensure consistency with training data)
+    X_scaled = scaler.fit_transform(X)
+
+    log_likelihoods = np.dot(X_scaled, np.log(np.clip(self.feature_probs.T, a_min=1e-10, a_max=None))) + np.dot(1 - X_scaled, np.log(1 - self.feature_probs.T + 1e-10))
+    log_posteriors = log_likelihoods + np.log(self.class_priors[:2])
+    return np.argmax(log_posteriors, axis=1)
+
+iris = load_iris()
+X, y = iris.data, iris.target
+
+X = X[y != 2]
+y = y[y != 2]
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+nb_classifier = NaiveBayesBinaryClassifier()
+nb_classifier.fit(X_train, y_train)
+
+predictions = nb_classifier.predict(X_test)
+
+accuracy = np.mean(predictions == y_test)
+print("Accuracy:", accuracy)

@@ -1,0 +1,123 @@
+def clean(x):
+    x=re.sub(r'http\S+','',x)
+    x=re.sub(r'\bcc\b|\bRT\b','',x)
+    x=re.sub(r'\#\w+|\@\w+','',x)
+    x=re.sub(r'[^a-zA-z0-9\s]','',x)
+    x=' '.join(x.split())
+    stop_words = set(stopwords.words('english'))
+    tokens = word_tokenize(x)
+    filtered_text = [word for word in tokens if word not in stop_words]
+    cleaned_text = ' '.join(filtered_text)
+    return cleaned_text
+
+df1['clean']=df1['Resume'].apply(clean)
+tokens=[x for x in nltk.word_tokenize(" ".join(df1["clean"]))if x.isalpha()]
+
+freq_dist = FreqDist(tokens)
+from nltk.tokenize import word_tokenize
+from nltk.corpus import stopwords
+from nltk import FreqDist
+
+
+
+def preprocess_data(df):
+    # Drop duplicates
+    df = df.drop_duplicates()
+    
+    # Remove cancelled orders
+    cancelled_orders = df[df['Quantity'] < 0]
+    df = df.drop(cancelled_orders.index)
+    
+    # Remove adjusted orders
+    adjusted_orders = df[df['InvoiceNo'].str.startswith(('A', 'C'))]
+    df = df.drop(adjusted_orders.index)
+    
+    # Drop rows with missing values
+    df = df.dropna()
+    
+    # Remove irrelevant stock codes
+    irrelevant_stockcodes = ['POST', 'PADS', 'M', 'DOT', 'C2', 'BANK CHARGES']
+    df = df[~df['StockCode'].isin(irrelevant_stockcodes)]
+    
+    # Remove outliers in Quantity
+    z_scores_quantity = (df['Quantity'] - df['Quantity'].mean()) / df['Quantity'].std()
+    df = df[(z_scores_quantity < 3)]
+    
+    # Remove outliers in UnitPrice
+    z_scores_unitprice = (df['UnitPrice'] - df['UnitPrice'].mean()) / df['UnitPrice'].std()
+    df = df[(z_scores_unitprice < 3)]
+    
+    # Convert 'InvoiceDate' to datetime
+    df['InvoiceDate'] = pd.to_datetime(df['InvoiceDate'])
+    
+    # Extract 'DayOfWeek' from 'InvoiceDate'
+    df['DayOfWeek'] = df['InvoiceDate'].dt.day_name()
+
+    return df
+
+# Assuming df_train is your DataFrame
+df_train_processed = preprocess_data(df_train)
+
+
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+def analyze_data(df):
+    def find_free_items(dataframe):
+        free_items = dataframe[dataframe['UnitPrice'] == 0]
+        num_free_items = len(free_items)
+        return num_free_items
+
+    num_free_items = find_free_items(df)
+    
+    print("Number of free items:", num_free_items)
+    def visualize_transactions_per_country(dataframe):
+        transactions_per_country = dataframe['Country'].value_counts()
+        plt.figure(figsize=(12, 6))
+        transactions_per_country.plot(kind='bar', color='skyblue')
+        plt.title('Number of Transactions per Country')
+        plt.xlabel('Country')
+        plt.ylabel('Number of Transactions')
+        plt.show()
+
+    visualize_transactions_per_country(df)
+
+    def visualize_customer_repeat_ratio(dataframe):
+        customer_repeat_status = dataframe.groupby('CustomerID')['InvoiceNo'].nunique() > 1
+        customer_repeat_ratio = customer_repeat_status.value_counts(normalize=True)
+        plt.figure(figsize=(6, 6))
+        customer_repeat_ratio.plot(kind='pie', autopct='%1.1f%%', colors=['lightcoral', 'lightgreen'])
+        plt.title('Customer Repeat Status Ratio')
+        plt.show()
+
+    visualize_customer_repeat_ratio(df)
+
+    def plot_unit_price_heatmap(dataframe):
+      dataframe['YearMonth'] = dataframe['InvoiceDate'].dt.to_period('M')
+
+      dataframe['MonthName'] = dataframe['YearMonth'].astype(str).str.slice(start=-2)
+
+
+      heatmap_data = dataframe.pivot_table(values='UnitPrice', index='MonthName', columns='DayOfWeek', aggfunc='mean')
+
+      plt.figure(figsize=(12, 8))
+      sns.heatmap(heatmap_data, cmap='coolwarm', annot=True, fmt=".2f", linewidths=.5)
+      plt.title('Unit Price Heatmap per Month and Day of the Week')
+      plt.show()
+
+
+    plot_unit_price_heatmap(df)
+
+    # 5. Find the top 10 customers who bought the most number of items. Also find the top 10 Items bought by the most number of customers.
+    def find_top_10_customers_and_items(dataframe):
+        top_10_customers = dataframe.groupby('CustomerID')['Quantity'].sum().nlargest(10)
+        top_10_items = dataframe.groupby('StockCode')['CustomerID'].nunique().nlargest(10)
+
+        print("Top 10 Customers who bought the most number of items:")
+        print(top_10_customers)
+
+        print("\nTop 10 Items bought by the most number of customers:")
+        print(top_10_items)
+
+    find_top_10_customers_and_items(df)
+analyze_data(df)
